@@ -14,37 +14,35 @@ func Subscribe() {
 	// 创建一个 ZMQ SUB 套接字
 	subscriber, err := zmq4.NewSocket(zmq4.SUB)
 	if err != nil {
-		log.Fatalf("Failed to create ZMQ socket: %v", err)
+		log.Printf("Failed to create ZMQ socket: %v \n", err)
 	}
 	defer subscriber.Close()
 	// 连接到发布者（Publisher）
 	err = subscriber.Connect("tcp://127.0.0.1:19400")
 	if err != nil {
-		log.Fatalf("Failed to connect to publisher: %v", err)
+		log.Printf("Failed to connect to publisher: %v \n", err)
 	}
-
 	// 设置订阅的过滤器，可以设置为空字符串 "" 来接收所有消息
 	err = subscriber.SetSubscribe("")
 	if err != nil {
-		log.Fatalf("Failed to set subscribe filter: %v", err)
+		log.Printf("Failed to set subscribe filter: %v \n", err)
 	}
-	fmt.Println("Waiting for messages...")
 	for {
 		// 接收消息
 		message, err := subscriber.Recv(0)
 		if err != nil {
-			log.Fatalf("Failed to receive message: %v", err)
+			log.Printf("Failed to receive message: %v \n", err)
 		}
 		topic, data := parseZmqData(message)
 		if topic == "node/np" {
 			var node model.Node
 			if err := json.Unmarshal([]byte(data), &node); err != nil {
-				log.Fatalf("Failed to unmarshal node: %v", err)
+				log.Printf("Failed to unmarshal node: %v \n", err)
 			}
 		} else if topic == "app/instances" {
 			var service []model.Service
 			if err := json.Unmarshal([]byte(data), &service); err != nil {
-				log.Fatalf("Failed to unmarshal service: %v", err)
+				log.Printf("Failed to unmarshal service: %v \n", err)
 			}
 		}
 	}

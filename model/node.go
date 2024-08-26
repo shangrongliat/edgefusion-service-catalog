@@ -16,3 +16,11 @@ type Info struct {
 	State    string `json:"state"`
 	Online   int    `json:"online"`
 }
+
+type NodeCache struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	State   string `json:"state"`
+	Passing int    `json:"passing"`
+	Warning int    `json:"warning"`
+}

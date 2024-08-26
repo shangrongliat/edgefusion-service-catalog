@@ -6,9 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-
-	"edgefusion-service-catalog/communication/broadcast"
-	"edgefusion-service-catalog/communication/unicast"
 )
 
 func main() {
@@ -28,17 +25,12 @@ func main() {
 	//	log.Fatalf("Error unmarshalling YAML data: %v", err)
 	//}
 
-	go broadcast.NewNotice()
-
-	go unicast.NewReceive()
+	//go broadcast.NewNotice()
+	//go unicast.NewReceive()
 	group.Wait()
 }
 
 func initLog(terminal bool) {
-	//cwd, err := os.Getwd()
-	//if err != nil {
-	//	log.Fatalf("Error getting current working directory: %v", err)
-	//}
 	// 构建日志文件的完整路径
 	logFilePath := filepath.Join("/etc/edgefusion/video/push/", "logs", "app.log")
 	// 创建文件夹 "logs" 如果它不存在
@@ -56,7 +48,6 @@ func initLog(terminal bool) {
 	if terminal {
 		// 创建一个 io.MultiWriter 实例，它允许我们将日志输出到多个地方
 		multiWriter := io.MultiWriter(os.Stdout, logFile)
-
 		// 设置 log 包的日志输出
 		log.SetOutput(multiWriter)
 	}
