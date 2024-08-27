@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+
+	"edgefusion-service-catalog/httplink"
 )
 
 func main() {
@@ -27,6 +29,7 @@ func main() {
 
 	//go broadcast.NewNotice()
 	//go unicast.NewReceive()
+	go httplink.Subscribe(nil)
 	group.Wait()
 }
 

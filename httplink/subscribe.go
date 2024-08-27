@@ -1,49 +1,52 @@
 package httplink
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
 
+	"edgefusion-service-catalog/cache"
 	"edgefusion-service-catalog/model"
-	"github.com/pebbe/zmq4"
+	"github.com/go-zeromq/zmq4"
 )
 
-func Subscribe() {
+func Subscribe(cache *cache.Cache) {
+	log.Println("ZMQ Subscribing start")
 	// 创建一个 ZMQ SUB 套接字
-	subscriber, err := zmq4.NewSocket(zmq4.SUB)
-	if err != nil {
-		log.Printf("Failed to create ZMQ socket: %v \n", err)
+	sub := zmq4.NewSub(context.Background())
+	//连接socket
+	if err := sub.Dial("tcp://172.16.100.85:19400"); err != nil {
+		return
 	}
-	defer subscriber.Close()
-	// 连接到发布者（Publisher）
-	err = subscriber.Connect("tcp://127.0.0.1:19400")
-	if err != nil {
-		log.Printf("Failed to connect to publisher: %v \n", err)
+	// 订阅所有主题 (空字符串表示订阅所有消息)
+	if err := sub.SetOption(zmq4.OptionSubscribe, "node/np"); err != nil {
+		return
 	}
-	// 设置订阅的过滤器，可以设置为空字符串 "" 来接收所有消息
-	err = subscriber.SetSubscribe("")
-	if err != nil {
-		log.Printf("Failed to set subscribe filter: %v \n", err)
+	if err := sub.SetOption(zmq4.OptionSubscribe, "app/instances"); err != nil {
+		return
 	}
 	for {
-		// 接收消息
-		message, err := subscriber.Recv(0)
+		message, err := sub.Recv()
 		if err != nil {
-			log.Printf("Failed to receive message: %v \n", err)
+			log.Println("error receive zmq msg", "err", err)
+			continue
 		}
-		topic, data := parseZmqData(message)
+		topic, data := parseZmqData(string(message.Bytes()))
+		log.Println("ZMQ Received message:", topic)
 		if topic == "node/np" {
 			var node model.Node
 			if err := json.Unmarshal([]byte(data), &node); err != nil {
 				log.Printf("Failed to unmarshal node: %v \n", err)
 			}
+			fmt.Println("node-----", node)
 		} else if topic == "app/instances" {
 			var service []model.Service
 			if err := json.Unmarshal([]byte(data), &service); err != nil {
 				log.Printf("Failed to unmarshal service: %v \n", err)
 			}
+			fmt.Println("service-----", service)
 		}
 	}
 }

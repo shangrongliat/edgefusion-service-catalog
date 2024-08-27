@@ -3,12 +3,13 @@ package cache
 import (
 	"encoding/json"
 	"errors"
-	"github.com/robfig/cron"
 	"io/ioutil"
 	"log"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/robfig/cron"
 
 	"edgefusion-service-catalog/model"
 )
@@ -26,12 +27,11 @@ type Cache struct {
 }
 
 // NewCacheManager 创建一个新的 内存管理
-func NewCacheManager(path, parentId string) *Cache {
+func NewCacheManager(path string) *Cache {
 	return &Cache{
 		local_cache: &model.Catalog{},
 		ecache:      make(map[string]*model.Catalog),
 		enode:       make(map[string]*model.NodeCache),
-		parentId:    parentId,
 		path:        path,
 		cron:        cron.New(),
 	}
