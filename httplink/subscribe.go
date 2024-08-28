@@ -34,7 +34,7 @@ func Subscribe(cache *cache.Cache) {
 			continue
 		}
 		topic, data := parseZmqData(string(message.Bytes()))
-		log.Println("ZMQ Received message:", topic)
+
 		if topic == "node/np" {
 			var node model.Node
 			if err := json.Unmarshal([]byte(data), &node); err != nil {
