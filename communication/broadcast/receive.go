@@ -1,15 +1,17 @@
-package unicast
+package broadcast
 
 import (
-	"edgefusion-service-catalog/cache"
-	"edgefusion-service-catalog/communication/listener"
-	"edgefusion-service-catalog/model"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net"
+
+	"edgefusion-service-catalog/cache"
+	"edgefusion-service-catalog/communication/listener"
+	"edgefusion-service-catalog/model"
 )
 
+// NewReceive 广播数据接收
 func NewReceive(listener *listener.Listener, cache *cache.Cache) {
 	// 创建UDP地址
 	addr, err := net.ResolveUDPAddr("udp4", ":9999")
@@ -37,7 +39,7 @@ func NewReceive(listener *listener.Listener, cache *cache.Cache) {
 			if _, exists := cache.GetECache(broadcast); exists {
 				continue
 			}
-			data := []byte{0}
+			data := []byte{1}
 			data = append(data, buf[:n]...)
 			// 发起询问
 			listener.Transmit(data, fmt.Sprintf("%s:64505", srcAddr.IP))

@@ -1,13 +1,15 @@
 package broadcast
 
 import (
-	"edgefusion-service-catalog/cache"
 	"encoding/json"
 	"log"
 	"net"
 	"time"
+
+	"edgefusion-service-catalog/cache"
 )
 
+// NewNotice 广播通知
 func NewNotice(cache *cache.Cache) {
 	// 创建UDP地址，使用广播地址和端口
 	addr, err := net.ResolveUDPAddr("udp4", "255.255.255.255:9999")
@@ -30,7 +32,7 @@ func NewNotice(cache *cache.Cache) {
 		if err != nil {
 			log.Printf("Failed to send data: %v \n", err)
 		}
-		// 每隔1秒发送一次
+		// 每隔10秒发送一次
 		time.Sleep(10 * time.Second)
 	}
 }

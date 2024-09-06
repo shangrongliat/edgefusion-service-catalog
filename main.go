@@ -10,6 +10,7 @@ import (
 	"edgefusion-service-catalog/httplink"
 )
 
+// TODO ./consul agent -data-dir=/home/work/cata/ds -bind=172.16.100.81 -client=0.0.0.0 -server -ui -bootstrap-expect=1
 func main() {
 	//initLog(false)
 	// 设置 log 包的日志输出

@@ -1,16 +1,18 @@
 package listener
 
 import (
-	"edgefusion-service-catalog/cache"
 	"fmt"
 	"log"
 	"net"
+
+	"edgefusion-service-catalog/cache"
 )
 
 type Listener struct {
 	conn net.PacketConn
 }
 
+// 监听本地端口
 func NewLister() *Listener {
 	conn, err := net.ListenPacket("udp", "0.0.0.0:64505")
 	if err != nil {
@@ -38,6 +40,7 @@ func (l *Listener) Lister(cache *cache.Cache) {
 		switch dataType {
 		case 0:
 			// 0 是本机发出询问后收到的反馈
+			// 收到其他节点发送的缓存信息
 			cache.AddECacheBinary(buf[1:n]) // 将收到的message添加到缓存中，由添加方法进行解析处理
 		case 1:
 			// 2是由其他设备发过来的询问请求
@@ -47,7 +50,7 @@ func (l *Listener) Lister(cache *cache.Cache) {
 			}
 			data := []byte{0}
 			data = append(data, catalog...)
-			l.Transmit(data, addr.String())
+			l.Transmit(data, fmt.Sprintf("%s:64505", addr.String()))
 		default:
 			// 未知类型不处理
 		}
@@ -55,6 +58,7 @@ func (l *Listener) Lister(cache *cache.Cache) {
 }
 
 func (t *Listener) Transmit(data []byte, remoteAddr string) {
+	fmt.Printf("udp转发地址：%s", remoteAddr)
 	remote, err := net.ResolveUDPAddr("udp", remoteAddr)
 	if err != nil {
 		log.Printf("节点同步信息询问远程地址[ %s ]初始化失败.%v \n", remoteAddr, err)

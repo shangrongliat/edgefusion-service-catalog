@@ -40,12 +40,24 @@ func Subscribe(cache *cache.Cache) {
 			if err := json.Unmarshal([]byte(data), &node); err != nil {
 				log.Printf("Failed to unmarshal node: %v \n", err)
 			}
+			// 根据上报的信息，判断是否要更新本地节点信息？
+			// 1. 判断父节点是否为原父节点：
+			//     1) 是， 判断父节点下边计算节点是否有变化
+			//        a. 有变化， 更新本地缓存信息
+			//        b. 没有变化， 跳过处理
+			//     2) 否， 当父节点发生变化时将原父节点下的边计算节点权重进行下降设置（设置为10），
+			//             将新的父节点下的边计算节点权重就行上调设置（设置为50）
+			// 平台协同关系不影响缓存版本
 			fmt.Println("node-----", node)
 		} else if topic == "app/instances" {
 			var service []model.Service
 			if err := json.Unmarshal([]byte(data), &service); err != nil {
 				log.Printf("Failed to unmarshal service: %v \n", err)
 			}
+			// 根据上报信息，判断是否要更新本地服务状态
+			// 服务状态分为 活跃/不活跃 两个状态
+			// 通过服务名称和服务状态判断服务是否有变化
+			// 1. 如果服务有变化，则更新服务状态的同时修改节点 version字段（版本变化）
 			fmt.Println("service-----", service)
 		}
 	}

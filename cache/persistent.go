@@ -17,10 +17,10 @@ import (
 // Cache 结构体用于管理用户
 type Cache struct {
 	sync.RWMutex                             // 读写锁，保护用户数据的并发访问
-	local_cache  *model.Catalog              // 用户数据存储在内存中的映射
-	ecache       map[string]*model.Catalog   // 用户数据存储在内存中的映射
-	parentId     string                      //父节点
-	enode        map[string]*model.NodeCache //父节点下的边计算节点
+	local_cache  *model.Catalog              // 本地节点数据存储在内存中的映射
+	ecache       map[string]*model.Catalog   // 外部节点数据存储在内存中的映射
+	parentId     string                      // 父节点
+	enode        map[string]*model.NodeCache // 父节点下的边计算节点
 	version      string                      // 信息版本
 	path         string                      // 持久化文件路径
 	cron         *cron.Cron                  // 定时器
@@ -38,6 +38,7 @@ func NewCacheManager(path string) *Cache {
 }
 
 // AddNodeCache 添加修改本地节点信息缓存与隶属边节点边计算节点对应关系
+// 节点的活跃与否只会影响该节点的权重信息，不会影响本地信息的版本
 func (c *Cache) AddNodeCache(cache *model.Node) {
 	c.Lock()
 	defer c.Unlock()
@@ -63,9 +64,9 @@ func (c *Cache) AddNodeCache(cache *model.Node) {
 			nodeCache.State = enode.State
 			// 根据新信息修改权重
 			if enode.State == "Activated" {
-				nodeCache.Warning = 0
+				nodeCache.Passing = 50
 			} else {
-				nodeCache.Warning = 1
+				nodeCache.Passing = 0
 			}
 		}
 	}
@@ -92,13 +93,18 @@ func (c *Cache) GetBroadcastInfo() (br model.Broadcast) {
 	return
 }
 
+// GetCacheBinary 获取二进制缓存信息
 func (c *Cache) GetCacheBinary(data []byte) []byte {
 	c.RLock()
 	defer c.RUnlock()
 	var cache model.Broadcast
 	// 解析判断，如果解析失败或者请求ID和本机ID不相同，则返回nil,此次询问不做回答
-	if err := json.Unmarshal(data, &cache); err != nil || cache.ID != c.local_cache.ID {
+	if err := json.Unmarshal(data, &cache); err != nil {
 		log.Printf("数据解析失败,缓存添加.数据: %s . 异常: %v \n", string(data), err)
+		return nil
+	}
+	if cache.ID == c.local_cache.ID {
+		log.Printf("询问自循环跳过处理.请求节点ID : %s . 本地节点ID: %s \n", cache.ID, c.local_cache.ID)
 		return nil
 	}
 	marshal, err := json.Marshal(c.local_cache)
@@ -124,6 +130,13 @@ func (c *Cache) AddECacheBinary(data []byte) {
 		log.Printf("数据解析失败,缓存添加.数据: %s . 异常: %v \n", string(data), err)
 		return
 	}
+	// 判断该节点是否在本地存在
+	if ecache, ok := c.ecache[cache.ID]; ok {
+		// 如果存在，则比对对应的服务状态变化情况
+		for sid, sinfo := range cache.SC {
+			ecache.SC[sid] = sinfo
+		}
+	}
 	c.ecache[cache.ID] = &cache
 
 }
@@ -133,7 +146,7 @@ func (c *Cache) GetECache(broadcast *model.Broadcast) (*model.Catalog, bool) {
 	c.RLock()
 	defer c.RUnlock()
 	cache, exists := c.ecache[broadcast.ID]
-	//
+	// 如果缓存中不存在或者版本不相同，则返回nil对象，并且返回false
 	if !exists || cache.Version != broadcast.Version {
 		return nil, false
 	}
@@ -173,6 +186,7 @@ func (c *Cache) ListECache() []*model.Catalog {
 	return caches
 }
 
+// Load 服务启动加载本地文件缓存
 func (c *Cache) Load() error {
 	data, err := ioutil.ReadFile(c.path)
 	if err != nil {
@@ -194,6 +208,7 @@ func (c *Cache) Load() error {
 	return nil
 }
 
+// Save 将缓存写入本地文件
 func (c *Cache) Save() error {
 	c.Lock()
 	defer c.Unlock()
@@ -212,6 +227,7 @@ func (c *Cache) Save() error {
 	return nil
 }
 
+// StartPersisting 定时本地持久化
 func (c *Cache) StartPersisting(interval time.Duration) {
 	job := func() {
 		if err := c.Save(); err != nil {
