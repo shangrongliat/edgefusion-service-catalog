@@ -50,7 +50,7 @@ func Subscribe(cache *cache.Cache) {
 			// 平台协同关系不影响缓存版本
 			fmt.Println("node-----", node)
 		} else if topic == "app/instances" {
-			var service []model.Service
+			var service []*model.Service
 			if err := json.Unmarshal([]byte(data), &service); err != nil {
 				log.Printf("Failed to unmarshal service: %v \n", err)
 			}
@@ -59,6 +59,7 @@ func Subscribe(cache *cache.Cache) {
 			// 通过服务名称和服务状态判断服务是否有变化
 			// 1. 如果服务有变化，则更新服务状态的同时修改节点 version字段（版本变化）
 			fmt.Println("service-----", service)
+			cache.AddServiceCache(service)
 		}
 	}
 }

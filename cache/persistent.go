@@ -3,12 +3,14 @@ package cache
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"sync"
 	"time"
 
+	"edgefusion-service-catalog/util"
 	"github.com/robfig/cron"
 
 	"edgefusion-service-catalog/model"
@@ -24,6 +26,7 @@ type Cache struct {
 	version      string                      // 信息版本
 	path         string                      // 持久化文件路径
 	cron         *cron.Cron                  // 定时器
+	StatusChan   chan string
 }
 
 // NewCacheManager 创建一个新的 内存管理
@@ -34,6 +37,7 @@ func NewCacheManager(path string) *Cache {
 		enode:       make(map[string]*model.NodeCache),
 		path:        path,
 		cron:        cron.New(),
+		StatusChan:  make(chan string), // 状态通知通道
 	}
 }
 
@@ -74,8 +78,41 @@ func (c *Cache) AddNodeCache(cache *model.Node) {
 	//c.version = util.ToStringUuid()
 }
 
-func (c *Cache) AddServiceCache(ser *model.Service) {
-
+func (c *Cache) AddServiceCache(ser []*model.Service) {
+	c.Lock()
+	defer c.Unlock()
+	// 更新标记，默认为false，当服务信息发生变化时，进行服务版本更新
+	updateFlag := false
+	sc := c.local_cache.SC
+	for _, service := range ser {
+		// 服务ID由节点ID与服务名称进行拼接
+		serID := fmt.Sprintf("%s*%s", c.local_cache.ID, service.Name)
+		oldCatalog, exist := sc[serID]
+		if !exist {
+			// 如果本地缓存没有该服务，则添加该服务，并且更新信息版本
+			sc[serID] = &model.ServiceCatalog{
+				ID:             serID,
+				Name:           service.Name,
+				Status:         service.Status,
+				CheckInterface: "", // 服务状态检测接口，当前为空
+				CheckInterval:  "",
+				Port:           "", //服务端口
+			}
+			updateFlag = true
+		} else {
+			// 如果对应服务存在，则判断其服务状态是否有变化
+			if oldCatalog.Status != service.Status {
+				// 从新修改状态
+				oldCatalog.Status = service.Status
+				updateFlag = true
+			}
+		}
+	}
+	// 根据修改标记进行版本升级控制
+	if updateFlag {
+		// 本地服务不在本地consul中注册
+		c.version = util.ToStringUuid()
+	}
 }
 
 // GetCache 获取本地节点缓存
@@ -138,7 +175,8 @@ func (c *Cache) AddECacheBinary(data []byte) {
 		}
 	}
 	c.ecache[cache.ID] = &cache
-
+	// TODO 将新增的服务ID写入管道中
+	c.StatusChan <- cache.ID
 }
 
 // GetECache 获取其他节点缓存
@@ -238,4 +276,20 @@ func (c *Cache) StartPersisting(interval time.Duration) {
 		return
 	}
 	c.cron.Start()
+}
+
+func (c *Cache) GetLocalCache() *model.Catalog {
+	return c.local_cache
+}
+
+func (c *Cache) GetLocalSc() map[string]*model.ServiceCatalog {
+	return c.local_cache.SC
+}
+
+func (c *Cache) GetCacheById(cacheId string) *model.Catalog {
+	catalog, ok := c.ecache[cacheId]
+	if !ok {
+		return nil
+	}
+	return catalog
 }
