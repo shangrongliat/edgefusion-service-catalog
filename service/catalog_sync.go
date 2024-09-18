@@ -1,6 +1,10 @@
 package service
 
-import "edgefusion-service-catalog/cache"
+import (
+	"fmt"
+
+	"edgefusion-service-catalog/cache"
+)
 
 type Sync struct {
 	cache *cache.Cache
@@ -24,6 +28,7 @@ func (s *Sync) serviceRegistry() {
 				// 根据节点ID获取缓存信息，将信息注册到服务中
 				catalogCache := s.cache.GetCacheById(id)
 				//拼接HTTP PUT结构体，后调用接口发送到consul中
+				fmt.Println(catalogCache)
 			}
 		}
 	}()
