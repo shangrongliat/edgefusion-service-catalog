@@ -59,11 +59,11 @@ func GetService() (data model.ServiceResult) {
 	return
 }
 
-func PutNode(body []byte) {
+func Put(body []byte) {
 	// 设置请求的数据
 	reader := bytes.NewReader(body)
 	// 创建一个PUT请求
-	req, err := http.NewRequest("PUT", "http://example.com/your/endpoint", reader)
+	req, err := http.NewRequest("PUT", "http://localhost:9202/v1/hook/dvr/testPut", reader)
 	if err != nil {
 		fmt.Println("Error creating request:", err)
 		return
@@ -86,5 +86,4 @@ func PutNode(body []byte) {
 	} // 打印响应状态码和响应体
 	fmt.Printf("Response Status: %s \n", resp.Status)
 	fmt.Printf("Response Body: %s \n", responseBody)
-
 }

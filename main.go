@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"io"
 	"log"
 	"os"
@@ -11,7 +12,7 @@ import (
 )
 
 // TODO ./consul agent -data-dir=/home/work/cata/ds -bind=172.16.100.81 -client=0.0.0.0 -server -ui -bootstrap-expect=1
-func main() {
+func main2() {
 	//initLog(false)
 	// 设置 log 包的日志输出
 	group := sync.WaitGroup{}
@@ -54,5 +55,15 @@ func initLog(terminal bool) {
 		multiWriter := io.MultiWriter(os.Stdout, logFile)
 		// 设置 log 包的日志输出
 		log.SetOutput(multiWriter)
+	}
+}
+
+func main() {
+	user := make(map[string]interface{})
+	user["name"] = "张三"
+	user["age"] = 18
+	msg, err := json.Marshal(user)
+	if err != nil {
+		log.Println(err, msg)
 	}
 }

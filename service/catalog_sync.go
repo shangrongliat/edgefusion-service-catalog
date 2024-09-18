@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"edgefusion-service-catalog/cache"
+	"edgefusion-service-catalog/model"
+	"edgefusion-service-catalog/model/consul"
 )
 
 type Sync struct {
@@ -32,4 +34,22 @@ func (s *Sync) serviceRegistry() {
 			}
 		}
 	}()
+}
+
+func (s *Sync) serviceConvertRegistry(ser *model.Catalog) {
+	var list []*consul.Register
+
+	for _, value := range ser.SC {
+		var register *consul.Register
+		register.Node = ser.ID
+		register.Address = ser.IP
+		register.TaggedAddr = consul.TaggedAddr{
+			Lan: ser.IP,
+		}
+		register.Service = consul.Service{
+			ID:      value.ID,
+			Service: value.Name,
+			Address: ser.IP,
+		}
+	}
 }
