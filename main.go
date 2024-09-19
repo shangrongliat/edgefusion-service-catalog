@@ -1,12 +1,15 @@
 package main
 
 import (
-	"encoding/json"
+	"context"
+	"fmt"
 	"io"
 	"log"
+	"net"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"edgefusion-service-catalog/httplink"
 )
@@ -59,11 +62,33 @@ func initLog(terminal bool) {
 }
 
 func main() {
-	user := make(map[string]interface{})
-	user["name"] = "张三"
-	user["age"] = 18
-	msg, err := json.Marshal(user)
+	// Consul DNS 服务器地址和端口
+	consulDNSServer := "127.0.0.1:8600"
+
+	// 要解析的域名
+	domain := "montage01.service.consul"
+
+	// 创建一个自定义的 DNS 解析器
+	resolver := &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+			d := net.Dialer{
+				Timeout:   10 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}
+			return d.Dial("udp", consulDNSServer)
+		},
+	}
+
+	// 解析域名
+	addrs, err := resolver.LookupHost(context.Background(), domain)
 	if err != nil {
-		log.Println(err, msg)
+		fmt.Printf("Error resolving %s: %v\n", domain, err)
+		return
+	}
+
+	// 打印解析结果
+	for _, addr := range addrs {
+		fmt.Println(addr)
 	}
 }

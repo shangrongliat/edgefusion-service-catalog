@@ -22,14 +22,15 @@ type Meta struct {
 	RedisVersion string `json:"redis_version"`
 }
 type Service struct {
-	ID         string     `json:"ID"`
-	Service    string     `json:"Service"`
-	Tags       []string   `json:"Tags"`
-	Address    string     `json:"Address"`
-	TaggedAddr TaggedAddr `json:"TaggedAddresses"`
-	Meta       Meta       `json:"Meta"`
-	Port       int        `json:"Port"`
-	Namespace  string     `json:"Namespace"`
+	ID         string       `json:"ID"`
+	Service    string       `json:"Service"`
+	Tags       []string     `json:"Tags"`
+	Address    string       `json:"Address"`
+	TaggedAddr TaggedAddr   `json:"TaggedAddresses"`
+	Weights    AgentWeights `json:"Weights"`
+	Meta       Meta         `json:"Meta"`
+	Port       int          `json:"Port"`
+	Namespace  string       `json:"Namespace"`
 }
 type Definition struct {
 	TCP                            string `json:"TCP"`
@@ -46,4 +47,9 @@ type Check struct {
 	ServiceID  string     `json:"ServiceID"`
 	Definition Definition `json:"Definition"`
 	Namespace  string     `json:"Namespace"`
+}
+
+type AgentWeights struct {
+	Passing int
+	Warning int
 }

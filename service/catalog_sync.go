@@ -51,5 +51,6 @@ func (s *Sync) serviceConvertRegistry(ser *model.Catalog) {
 			Service: value.Name,
 			Address: ser.IP,
 		}
+		
 	}
 }
