@@ -17,7 +17,7 @@ func Subscribe(cache *cache.Cache) {
 	// 创建一个 ZMQ SUB 套接字
 	sub := zmq4.NewSub(context.Background())
 	//连接socket
-	if err := sub.Dial("tcp://172.16.100.85:19400"); err != nil {
+	if err := sub.Dial("tcp://127.0.0.1:19400"); err != nil {
 		return
 	}
 	// 订阅所有主题 (空字符串表示订阅所有消息)
@@ -34,7 +34,6 @@ func Subscribe(cache *cache.Cache) {
 			continue
 		}
 		topic, data := parseZmqData(string(message.Bytes()))
-
 		if topic == "node/np" {
 			var node model.Node
 			if err := json.Unmarshal([]byte(data), &node); err != nil {
@@ -48,9 +47,9 @@ func Subscribe(cache *cache.Cache) {
 			//     2) 否， 当父节点发生变化时将原父节点下的边计算节点权重进行下降设置（设置为10），
 			//             将新的父节点下的边计算节点权重就行上调设置（设置为50）
 			// 平台协同关系不影响缓存版本
-			fmt.Println("node-----", node)
+			cache.AddNodeCache(&node)
 		} else if topic == "app/instances" {
-			var service []*model.Service
+			var service []model.Service
 			if err := json.Unmarshal([]byte(data), &service); err != nil {
 				log.Printf("Failed to unmarshal service: %v \n", err)
 			}
@@ -58,7 +57,6 @@ func Subscribe(cache *cache.Cache) {
 			// 服务状态分为 活跃/不活跃 两个状态
 			// 通过服务名称和服务状态判断服务是否有变化
 			// 1. 如果服务有变化，则更新服务状态的同时修改节点 version字段（版本变化）
-			fmt.Println("service-----", service)
 			cache.AddServiceCache(service)
 		}
 	}

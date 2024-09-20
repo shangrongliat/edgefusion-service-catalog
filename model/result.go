@@ -7,7 +7,7 @@ type NodeResult struct {
 }
 
 type ServiceResult struct {
-	Code int     `json:"code"`
-	Msg  string  `json:"msg"`
-	Data Service `json:"data"`
+	Code int        `json:"code"`
+	Msg  string     `json:"msg"`
+	Data []*Service `json:"data"`
 }

@@ -18,9 +18,7 @@ type Info struct {
 }
 
 type NodeCache struct {
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	State   string `json:"state"`
-	Passing int    `json:"passing"`
-	Warning int    `json:"warning"`
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	State string `json:"state"`
 }

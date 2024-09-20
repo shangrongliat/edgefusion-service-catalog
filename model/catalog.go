@@ -2,10 +2,10 @@ package model
 
 // 目录结构
 type Catalog struct {
-	IP      string                     `json:"ip"`      // 本机IP
-	ID      string                     `json:"id"`      // 本机ID（节点ID）
-	Version string                     `json:"version"` // 数据版本(当该结构为本地缓存时，字段为空)
-	SC      map[string]*ServiceCatalog `json:"sc"`      // 服务目录（只存放“service”类型的服务） key 服务ID value 服务信息
+	IP      string                    `json:"ip"`      // 本机IP
+	ID      string                    `json:"id"`      // 本机ID（节点ID）
+	Version string                    `json:"version"` // 数据版本(当该结构为本地缓存时，字段为空)
+	SC      map[string]ServiceCatalog `json:"sc"`      // 服务目录（只存放“service”类型的服务） key 服务ID value 服务信息
 }
 
 // 目录属性
@@ -22,6 +22,7 @@ type ServiceCatalog struct {
 type CacheData struct {
 	LocalCache *Catalog
 	Ecache     map[string]*Catalog
+	Enode      map[string]*NodeCache
 	ParentId   string
 	Version    string
 }

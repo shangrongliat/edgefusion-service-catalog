@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"edgefusion-service-catalog/model"
+	"edgefusion-service-catalog/model/consul"
 )
 
 func GetNode() (data model.NodeResult) {
@@ -59,11 +60,16 @@ func GetService() (data model.ServiceResult) {
 	return
 }
 
-func Put(body []byte) {
+func Put(msg *consul.Register) {
+	log.Println("服务注册", msg)
+	body, err := json.Marshal(msg)
+	if err != nil {
+		log.Println("目录服务注册失败", msg)
+	}
 	// 设置请求的数据
 	reader := bytes.NewReader(body)
 	// 创建一个PUT请求
-	req, err := http.NewRequest("PUT", "http://localhost:9202/v1/hook/dvr/testPut", reader)
+	req, err := http.NewRequest("PUT", "http://127.0.0.1:8500/v1/agent/service/register", reader)
 	if err != nil {
 		fmt.Println("Error creating request:", err)
 		return

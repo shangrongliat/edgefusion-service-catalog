@@ -3,12 +3,11 @@ package cache
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 	"sync"
-	"time"
 
 	"edgefusion-service-catalog/util"
 	"github.com/robfig/cron"
@@ -22,7 +21,7 @@ type Cache struct {
 	local_cache  *model.Catalog              // 本地节点数据存储在内存中的映射
 	ecache       map[string]*model.Catalog   // 外部节点数据存储在内存中的映射
 	parentId     string                      // 父节点
-	enode        map[string]*model.NodeCache // 父节点下的边计算节点
+	enode        map[string]*model.NodeCache // 父节点下的边计算节点 节点ID--> 节点
 	version      string                      // 信息版本
 	path         string                      // 持久化文件路径
 	cron         *cron.Cron                  // 定时器
@@ -31,14 +30,23 @@ type Cache struct {
 
 // NewCacheManager 创建一个新的 内存管理
 func NewCacheManager(path string) *Cache {
-	return &Cache{
+	cache := &Cache{
 		local_cache: &model.Catalog{},
-		ecache:      make(map[string]*model.Catalog),
-		enode:       make(map[string]*model.NodeCache),
+		ecache:      make(map[string]*model.Catalog, 0),
+		enode:       make(map[string]*model.NodeCache, 0),
 		path:        path,
 		cron:        cron.New(),
 		StatusChan:  make(chan string), // 状态通知通道
 	}
+	cache.local_cache.SC = make(map[string]model.ServiceCatalog, 0)
+	// 尝试加载本地缓存信息
+	err := cache.Load()
+	if err != nil {
+		log.Printf("Error loading cache manager %v \r", err)
+	}
+	//定时将本地缓存信息写入本地文件中
+	cache.StartPersisting()
+	return cache
 }
 
 // AddNodeCache 添加修改本地节点信息缓存与隶属边节点边计算节点对应关系
@@ -56,47 +64,48 @@ func (c *Cache) AddNodeCache(cache *model.Node) {
 		if !ok && enode.State == "Activated" {
 			// 缓存中不存在此边界点，并且节点状态为活跃，则新增边计算节点
 			c.enode[enode.ID] = &model.NodeCache{
-				ID:      enode.IP,
-				Name:    enode.Name,
-				State:   enode.State,
-				Passing: 50,
-				Warning: 0,
+				ID:    enode.IP,
+				Name:  enode.Name,
+				State: enode.State,
 			}
 		} else if ok && enode.State != nodeCache.State {
 			// 缓存中存在该边计算节点，并且状态与新的信息状态不同
 			// 先更新缓存状态
 			nodeCache.State = enode.State
-			// 根据新信息修改权重
-			if enode.State == "Activated" {
-				nodeCache.Passing = 50
-			} else {
-				nodeCache.Passing = 0
-			}
 		}
 	}
 	// 修改本地节点缓存时，同时修改版本号
 	//c.version = util.ToStringUuid()
 }
 
-func (c *Cache) AddServiceCache(ser []*model.Service) {
+func (c *Cache) AddServiceCache(ser []model.Service) {
 	c.Lock()
 	defer c.Unlock()
 	// 更新标记，默认为false，当服务信息发生变化时，进行服务版本更新
 	updateFlag := false
-	sc := c.local_cache.SC
 	for _, service := range ser {
 		// 服务ID由节点ID与服务名称进行拼接
-		serID := fmt.Sprintf("%s*%s", c.local_cache.ID, service.Name)
-		oldCatalog, exist := sc[serID]
-		if !exist {
-			// 如果本地缓存没有该服务，则添加该服务，并且更新信息版本
-			sc[serID] = &model.ServiceCatalog{
-				ID:             serID,
-				Name:           service.Name,
+		//serID := fmt.Sprintf("%s*%s", c.local_cache.ID, service.Name)
+		oldCatalog, exist := c.local_cache.SC[service.Name]
+		split := strings.Split(service.Name, ".")
+		if !exist && len(split) > 1 {
+			// 如果本地缓存没有该服务，则添加该服务，并且更新信息版本.
+
+			serviceCatalog := model.ServiceCatalog{
+				ID:             service.Name,
+				Name:           split[1],
 				Status:         service.Status,
 				CheckInterface: "", // 服务状态检测接口，当前为空
 				CheckInterval:  "",
 				Port:           "", //服务端口
+			}
+			if c.local_cache.SC == nil {
+				log.Println("SC初始化。。。。。。")
+				sc := make(map[string]model.ServiceCatalog, 0)
+				sc[service.Name] = serviceCatalog
+				c.local_cache.SC = sc
+			} else {
+				c.local_cache.SC[service.Name] = serviceCatalog
 			}
 			updateFlag = true
 		} else {
@@ -127,6 +136,7 @@ func (c *Cache) GetBroadcastInfo() (br model.Broadcast) {
 	defer c.RUnlock()
 	br.ID = c.local_cache.ID
 	br.Version = c.version
+	log.Printf("获取本地节点ID：%s 本地版本信息：%s \r", br.ID, br.Version)
 	return
 }
 
@@ -137,18 +147,19 @@ func (c *Cache) GetCacheBinary(data []byte) []byte {
 	var cache model.Broadcast
 	// 解析判断，如果解析失败或者请求ID和本机ID不相同，则返回nil,此次询问不做回答
 	if err := json.Unmarshal(data, &cache); err != nil {
-		log.Printf("数据解析失败,缓存添加.数据: %s . 异常: %v \n", string(data), err)
+		log.Printf("数据解析失败,缓存添加.数据: %s . 异常: %v \r\n", string(data), err)
 		return nil
 	}
-	if cache.ID == c.local_cache.ID {
-		log.Printf("询问自循环跳过处理.请求节点ID : %s . 本地节点ID: %s \n", cache.ID, c.local_cache.ID)
-		return nil
+	// TODO 根据请求的节点ID获取本地节点信息，判断节点和对应的版本信息是否有变化
+	if cache.ID == c.local_cache.ID && cache.Version != c.local_cache.Version {
+		log.Printf("本机信息发生变化,询问版本:%s 本机版本: %s", cache.Version, c.local_cache.Version)
+		marshal, err := json.Marshal(c.local_cache)
+		if err != nil {
+			log.Printf("本地数据json化失败.%v \r\n", err)
+		}
+		return marshal
 	}
-	marshal, err := json.Marshal(c.local_cache)
-	if err != nil {
-		log.Printf("本地数据json化失败.%v \n", err)
-	}
-	return marshal
+	return nil
 }
 
 // AddECache 添加其他节点缓存
@@ -247,12 +258,13 @@ func (c *Cache) Load() error {
 }
 
 // Save 将缓存写入本地文件
-func (c *Cache) Save() error {
+func (c *Cache) save() error {
 	c.Lock()
 	defer c.Unlock()
 	data, err := json.Marshal(model.CacheData{
 		LocalCache: c.local_cache,
 		Ecache:     c.ecache,
+		Enode:      c.enode,
 		ParentId:   c.parentId,
 		Version:    c.version,
 	})
@@ -266,9 +278,10 @@ func (c *Cache) Save() error {
 }
 
 // StartPersisting 定时本地持久化
-func (c *Cache) StartPersisting(interval time.Duration) {
+func (c *Cache) StartPersisting() {
 	job := func() {
-		if err := c.Save(); err != nil {
+		log.Println("缓存信息本地持久化")
+		if err := c.save(); err != nil {
 			log.Println("Error saving cache:", err)
 		}
 	}
@@ -282,7 +295,7 @@ func (c *Cache) GetLocalCache() *model.Catalog {
 	return c.local_cache
 }
 
-func (c *Cache) GetLocalSc() map[string]*model.ServiceCatalog {
+func (c *Cache) GetLocalSc() map[string]model.ServiceCatalog {
 	return c.local_cache.SC
 }
 
@@ -292,4 +305,12 @@ func (c *Cache) GetCacheById(cacheId string) *model.Catalog {
 		return nil
 	}
 	return catalog
+}
+
+func (c *Cache) IsBrotherNode(nodeId string) bool {
+	_, ok := c.ecache[nodeId]
+	if ok {
+		return true
+	}
+	return false
 }

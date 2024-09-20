@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -11,36 +12,53 @@ import (
 	"sync"
 	"time"
 
+	"edgefusion-service-catalog/cache"
+	"edgefusion-service-catalog/communication/broadcast"
+	"edgefusion-service-catalog/communication/listener"
+	"edgefusion-service-catalog/config"
 	"edgefusion-service-catalog/httplink"
+	"edgefusion-service-catalog/service"
+	"gopkg.in/yaml.v3"
 )
 
 // TODO ./consul agent -data-dir=/home/work/cata/ds -bind=172.16.100.81 -client=0.0.0.0 -server -ui -bootstrap-expect=1
-func main2() {
+func main() {
 	//initLog(false)
 	// 设置 log 包的日志输出
 	group := sync.WaitGroup{}
 	group.Add(1)
 	defer group.Done()
 	// 加载配置文件
-	//yamlFile, err := ioutil.ReadFile("./config.yml")
-	//if err != nil {
-	//	log.Fatalf("Error reading YAML file: %v", err)
-	//}
-	//// 解析 YAML 文件
-	//var cfg config.Config
-	//if err = yaml.Unmarshal(yamlFile, &cfg); err != nil {
-	//	log.Fatalf("Error unmarshalling YAML data: %v", err)
-	//}
+	yamlFile, err := ioutil.ReadFile("./conf/config.yml")
+	if err != nil {
+		log.Fatalf("Error reading YAML file: %v", err)
+	}
+	// 解析 YAML 文件
+	var cfg config.Config
+	if err = yaml.Unmarshal(yamlFile, &cfg); err != nil {
+		log.Fatalf("Error unmarshalling YAML data: %v", err)
+	}
+	caches := cache.NewCacheManager(cfg.CachePath)
+	catalogSync := service.NewCatalogSync(caches)
+	// 调用主动接口回去本地节点信息和本地服务信息
+	//localNode := httplink.GetNode()
+	//caches.AddNodeCache(&localNode.Data)
+	//localService := httplink.GetService()
+	//caches.AddServiceCache(localService.Data)
 
-	//go broadcast.NewNotice()
-	//go unicast.NewReceive()
-	go httplink.Subscribe(nil)
+	lister := listener.NewLister()
+	go broadcast.NewNotice(caches)
+	go lister.Lister(caches)
+	go broadcast.NewReceive(lister, caches)
+	go httplink.Subscribe(caches)
+
+	go catalogSync.ServiceRegistry()
 	group.Wait()
 }
 
 func initLog(terminal bool) {
 	// 构建日志文件的完整路径
-	logFilePath := filepath.Join("/etc/edgefusion/video/push/", "logs", "app.log")
+	logFilePath := filepath.Join("/home/work/catalog/", "logs", "app.log")
 	// 创建文件夹 "logs" 如果它不存在
 	err := os.MkdirAll(filepath.Dir(logFilePath), 0755)
 	if err != nil {
@@ -61,7 +79,7 @@ func initLog(terminal bool) {
 	}
 }
 
-func main() {
+func test() {
 	// Consul DNS 服务器地址和端口
 	consulDNSServer := "127.0.0.1:8600"
 

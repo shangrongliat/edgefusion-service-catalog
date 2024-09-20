@@ -1,7 +1,6 @@
 package listener
 
 import (
-	"fmt"
 	"log"
 	"net"
 
@@ -16,23 +15,27 @@ type Listener struct {
 func NewLister() *Listener {
 	conn, err := net.ListenPacket("udp", "0.0.0.0:64505")
 	if err != nil {
-		log.Printf("Failed to bind to address . %v \n", err)
+		log.Printf("Failed to bind to address . %v \r\n", err)
 	}
-	log.Printf("udp lister start \n")
+	log.Printf("udp lister start \r\n")
 	return &Listener{conn: conn}
 }
 
 func (l *Listener) Lister(cache *cache.Cache) {
 	defer func(conn net.PacketConn) {
 		if err := conn.Close(); err != nil {
-			log.Printf("Failed to close from UDP: %v \n", err)
+			log.Printf("Failed to close from UDP: %v \r\n", err)
 		}
 	}(l.conn)
 	buf := make([]byte, 4050)
 	for {
 		n, addr, err := l.conn.ReadFrom(buf)
 		if err != nil {
-			log.Printf("Failed to read from UDP: %v \n", err)
+			log.Printf("Failed to read from UDP: %v \r\n", err)
+			continue
+		}
+		// 跳过本地请求
+		if addr.String() == cache.GetLocalCache().IP {
 			continue
 		}
 		//TODO 这里收到的消息会有2种：
@@ -50,7 +53,7 @@ func (l *Listener) Lister(cache *cache.Cache) {
 			}
 			data := []byte{0}
 			data = append(data, catalog...)
-			l.Transmit(data, fmt.Sprintf("%s:64505", addr.String()))
+			l.Transmit(data, addr.String())
 		default:
 			// 未知类型不处理
 		}
@@ -58,13 +61,12 @@ func (l *Listener) Lister(cache *cache.Cache) {
 }
 
 func (t *Listener) Transmit(data []byte, remoteAddr string) {
-	fmt.Printf("udp转发地址：%s", remoteAddr)
 	remote, err := net.ResolveUDPAddr("udp", remoteAddr)
 	if err != nil {
-		log.Printf("节点同步信息询问远程地址[ %s ]初始化失败.%v \n", remoteAddr, err)
+		log.Printf("节点同步信息询问远程地址[ %s ]初始化失败.%v \r\n", remoteAddr, err)
 	}
 	if _, err := t.conn.WriteTo(data, remote); err != nil {
-		fmt.Printf("Error sending UDP packet: %v \n", err)
+		log.Printf("Error sending UDP packet: %v \r\n", err)
 		return
 	}
 }
